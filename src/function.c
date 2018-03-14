@@ -277,7 +277,7 @@ void uopz_get_static(zend_class_entry *clazz, zend_string *function, zval *retur
 	}
 
 	ZVAL_ARR(return_value, entry->op_array.static_variables);
-	GC_REFCOUNT(entry->op_array.static_variables)++;
+	GC_SET_REFCOUNT(entry->op_array.static_variables, GC_REFCOUNT(entry->op_array.static_variables) + 1);
 } /* }}} */
 
 #endif	/* UOPZ_FUNCTION */

@@ -128,7 +128,7 @@ int uopz_no_exit_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 		zval *estatus;
 
 		if (EX(opline)->op1_type == IS_CONST) {
-			estatus = EX_CONSTANT(EX(opline)->op1);
+			estatus = RT_CONSTANT(EX(opline), EX(opline)->op1);
 		} else estatus = EX_VAR(EX(opline)->op1.var);
 
 		if (Z_ISREF_P(estatus)) {
@@ -160,14 +160,12 @@ int uopz_call_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 		case ZEND_INIT_FCALL_BY_NAME:
 		case ZEND_INIT_FCALL:
 		case ZEND_INIT_NS_FCALL_BY_NAME: {
-			zval *function_name = EX_CONSTANT(EX(opline)->op2);
-			CACHE_PTR(Z_CACHE_SLOT_P(function_name), NULL);
+			CACHE_PTR(EX(opline)->result.num, NULL);
 		} break;
 
 		case ZEND_INIT_METHOD_CALL: {
 			if (EX(opline)->op2_type == IS_CONST) {
-				zval *function_name = EX_CONSTANT(EX(opline)->op2);
-				CACHE_POLYMORPHIC_PTR(Z_CACHE_SLOT_P(function_name), NULL, NULL);
+				CACHE_POLYMORPHIC_PTR(EX(opline)->extended_value, NULL, NULL);
 			}
 		} break;
 
@@ -175,9 +173,9 @@ int uopz_call_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 			zend_class_entry *ce;
 			zval *mock;
 			zend_string *key = NULL;
-			
+
 			if (EX(opline)->op1_type == IS_CONST) {
-				key = zend_string_tolower(Z_STR_P(EX_CONSTANT(EX(opline)->op1)));
+				key = zend_string_tolower(Z_STR_P(RT_CONSTANT(EX(opline), EX(opline)->op1)));
 			} else if (EX(opline)->op1_type != IS_UNUSED) 	{
 				ce = Z_CE_P(EX_VAR(EX(opline)->op1.var));
 				if (!ce) {
@@ -197,21 +195,21 @@ int uopz_call_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 				} else poser = Z_OBJCE_P(mock);
 
 				if (EX(opline)->op1_type == IS_CONST) {
-					CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op1)), poser);
+					CACHE_PTR(EX(opline)->result.num, poser);
 				} else {
 					Z_CE_P(EX_VAR(EX(opline)->op1.var)) = poser;
 				}
 			}
 
 			if (key && EX(opline)->op2_type == IS_CONST) {
-				zval *function_name = EX_CONSTANT(EX(opline)->op2);
+				zval *function_name = RT_CONSTANT(EX(opline), EX(opline)->op2);
 				if (EX(opline)->op1_type == IS_CONST) {
-					CACHE_PTR(Z_CACHE_SLOT_P(function_name), NULL);
+					CACHE_PTR(EX(opline)->result.num, NULL);
 				} else {
-					CACHE_POLYMORPHIC_PTR(Z_CACHE_SLOT_P(function_name), NULL, NULL);
+					CACHE_POLYMORPHIC_PTR(EX(opline)->extended_value, NULL, NULL);
 				}
 			}
-			
+
 			if (key) {
 				zend_string_release(key);
 			}
@@ -241,13 +239,13 @@ int uopz_call_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 
 int uopz_constant_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 #if PHP_VERSION_ID >= 70100
-	if (CACHED_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)))) {
-		CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)), NULL);
+	if (EXPECTED(CACHED_PTR(EX(opline)->result.num))) {
+		CACHE_PTR(EX(opline)->result.num, NULL);
 	}
 #else
 	if (EX(opline)->op1_type == IS_UNUSED) {
-		if (CACHED_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)))) {
-			CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)), NULL);
+		if (CACHED_PTR(EX(opline))) {
+			CACHE_PTR(EX(opline), NULL);
 		}
 	} else {
 		zend_string *key = NULL;
@@ -255,23 +253,23 @@ int uopz_constant_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 		zend_class_entry *poser = NULL;
 
 		if (EX(opline)->op1_type == IS_CONST) {
-			key = zend_string_tolower(Z_STR_P(EX_CONSTANT(EX(opline)->op1)));			
+			key = zend_string_tolower(Z_STR_P(RT_CONSTANT(EX(opline), EX(opline)->op1)));
 
 			if ((mock = zend_hash_find(&UOPZ(mocks), key))) {
 				if (Z_TYPE_P(mock) == IS_OBJECT) {
 					poser = Z_OBJCE_P(mock);
 				} else poser = zend_lookup_class(Z_STR_P(mock));
-				CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op1)), poser);
+				CACHE_PTR(EX(opline), poser);
 			}
 
-			if (CACHED_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)))) {
-				CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)), NULL);
+			if (CACHED_PTR(Z_CACHE_SLOT_P(RT_CONSTANT(EX(opline), EX(opline)->op2)))) {
+				CACHE_PTR(EX(opline), NULL);
 			}
 
-			zend_string_release(key);		
+			zend_string_release(key);
 		} else {
 			key = zend_string_tolower(Z_CE_P(EX_VAR(EX(opline)->op1.var))->name);
-			
+
 			if ((mock = zend_hash_find(&UOPZ(mocks), key))) {
 				if (Z_TYPE_P(mock) == IS_OBJECT) {
 					poser = Z_OBJCE_P(mock);
@@ -280,7 +278,7 @@ int uopz_constant_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 				Z_CE_P(EX_VAR(EX(opline)->op1.var)) = poser;
 			}
 
-			CACHE_POLYMORPHIC_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)), 
+			CACHE_POLYMORPHIC_PTR(EX(opline)->extended_value,
 								  Z_CE_P(EX_VAR(EX(opline)->op1.var)), NULL);
 
 			zend_string_release(key);
@@ -302,10 +300,10 @@ int uopz_mock_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 	zend_class_entry *ce;
 
 	if (EX(opline)->op1_type == IS_CONST) {
-		ce = CACHED_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op1)));
+		ce = CACHED_PTR(EX(opline)->result.num);
 
 		if (UNEXPECTED(ce == NULL)) {
-			key = Z_STR_P(EX_CONSTANT(EX(opline)->op1));
+			key = Z_STR_P(RT_CONSTANT(EX(opline), EX(opline)->op1));
 		} else {
 			key = ce->name;
 		}
@@ -344,13 +342,13 @@ int uopz_mock_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 				ce = zend_lookup_class(Z_STR_P(mock));
 				if (EXPECTED(ce)) {
 					if (EX(opline)->op1_type == IS_CONST) {
-						CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op1)), ce);
+						CACHE_PTR(EX(opline)->result.num, ce);
 					} else if (EX(opline)->op1_type != IS_UNUSED) {
 						Z_CE_P(EX_VAR(EX(opline)->op1.var)) = ce;
 					} else {
-						/* oh dear, can't do what is requested */			
+						/* oh dear, can't do what is requested */
 					}
-					
+
 				}
 			break;
 		}
@@ -433,32 +431,32 @@ _uopz_return_handler_dispatch:
 #ifdef ZEND_FETCH_CLASS_CONSTANT
 int uopz_class_constant_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 	if (EX(opline)->op1_type == IS_CONST) {
-		zval *name = EX_CONSTANT(EX(opline)->op1);
+		zval *name = RT_CONSTANT(EX(opline), EX(opline)->op1);
 		zend_string *key = Z_STR_P(name);
 		zval *mock = NULL;
 		zend_class_entry *poser = NULL;
 
 		key = zend_string_tolower(key);
-		
+
 		if ((mock = zend_hash_find(&UOPZ(mocks), key))) {
 			if (Z_TYPE_P(mock) == IS_OBJECT) {
 				poser = Z_OBJCE_P(mock);
 			} else poser = zend_lookup_class(Z_STR_P(mock));
 
 			if (poser) {
-				CACHE_PTR(Z_CACHE_SLOT_P(name), poser);
+				CACHE_PTR(EX(opline)->result.num, poser);
 			}
 		}
 
 		zend_string_release(key);
 	}
 
-	CACHE_PTR(Z_CACHE_SLOT_P(EX_CONSTANT(EX(opline)->op2)), NULL);
+	CACHE_PTR(EX(opline)->result.num, NULL);
 
 	if (uopz_fetch_class_constant_handler) {
 		return uopz_fetch_class_constant_handler(UOPZ_OPCODE_HANDLER_ARGS_PASSTHRU);
 	}
-	
+
 	return ZEND_USER_OPCODE_DISPATCH;
 } /* }}} */
 #endif
@@ -472,13 +470,13 @@ int uopz_fetch_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 		if (EX(opline)->op2_type == IS_UNUSED) {
 			break;
 		}
-		
+
 		if (EX(opline)->op2_type == IS_CONST) {
-			name = 
-				EX_CONSTANT(EX(opline)->op2);
+			name =
+				RT_CONSTANT(EX(opline), EX(opline)->op2);
 			if (name) {
 				key = Z_STR_P(name);
-			}			
+			}
 		} else if (EX(opline)->op2_type != IS_UNUSED) {
 			name = EX_VAR(EX(opline)->op2.var);
 			if (Z_TYPE_P(name) == IS_STRING) {
@@ -504,7 +502,7 @@ int uopz_fetch_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 
 				if (ce) {
 					if (EX(opline)->op2_type == IS_CONST) {
-						CACHE_PTR(Z_CACHE_SLOT_P(name), ce);
+						CACHE_PTR(EX(opline)->result.num, ce);
 					}
 
 					Z_CE_P(EX_VAR(EX(opline)->result.var)) = ce;
@@ -528,23 +526,23 @@ int uopz_fetch_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
 } /* }}} */
 
 int uopz_add_class_handler(UOPZ_OPCODE_HANDLER_ARGS) { /* {{{ */
-	zval *name = EX_CONSTANT(EX(opline)->op2);
+	zval *name = RT_CONSTANT(EX(opline), EX(opline)->op2);
 	zend_string *key = zend_string_tolower(Z_STR_P(name));
 	zval *mock = NULL;
-	
+
 	if ((mock = zend_hash_find(&UOPZ(mocks), key))) {
 		if (Z_TYPE_P(mock) == IS_STRING) {
 			zend_class_entry *ce = zend_lookup_class(Z_STR_P(mock));
-			
+
 			if (ce) {
-				CACHE_PTR(Z_CACHE_SLOT_P(name), ce);
+				CACHE_PTR(EX(opline)->result.num, ce);
 			}
 		} else {
-			CACHE_PTR(Z_CACHE_SLOT_P(name), Z_OBJCE_P(mock));
+			CACHE_PTR(EX(opline)->result.num, Z_OBJCE_P(mock));
 		}
 	}
-	
-	zend_string_release(key);	
+
+	zend_string_release(key);
 
 	if (uopz_add_trait_handler || uopz_add_interface_handler) {
 		switch (EX(opline)->opcode) {
